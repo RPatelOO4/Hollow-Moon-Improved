@@ -1,0 +1,45 @@
+Hollow Moon -- Werewolves-style game over UNIX datagram sockets (asyncio)
+========================================================================
+Files
+  hollowcomm.py   the ONE communications library (DatagramHub/DatagramClient;
+                  original stream Hub/Client still available)
+  moderator.py    game server / rules; runs as Linux user hw_mod
+  player.py       interactive terminal client; run as your own player user
+  bot.py          automatic player (same communications API) to fill the table
+  setup_users.sh / teardown_users.sh   create/remove Linux users and install to /opt/hollow
+  Hollow_Moon_Report.pdf / Hollow_Moon_Poster.pdf   report and poster
+
+Requirements: Linux, Python 3.8+ (standard library only), root for user setup.
+
+Quick start (7 players)
+  sudo bash setup_users.sh 7
+  sudo -u hw_mod python3 /opt/hollow/moderator.py --players 7 --night 30 --talk 40 --vote 20
+  sudo -u hw_alice python3 /opt/hollow/player.py        # terminal 1; separate users for other players
+  sudo -u hw_bob python3 /opt/hollow/player.py          # terminal 2
+  sudo -u hw_carol python3 /opt/hollow/bot.py           # bots can fill the remaining seats
+  ...
+  The game starts when --players have joined, or when >= --min-players (5) type /ready.
+  Default times: --night 45 --talk 120 --vote 40 (seconds). Add --seed N for repeatable roles.
+  Type /help in a player terminal for commands; sudo bash teardown_users.sh removes the setup.
+
+New in Projects 2/3
+  UNIX datagram sockets are the default. To run the original Project 1 stream version,
+  add --transport stream to BOTH the moderator and all player/bot commands.
+  Datagrams add per-message Linux credential checks, rate limits, and heartbeat detection.
+  Classmate-feedback fixes address dead-wolf reconnects, wolf disconnections, and bot claims.
+  The moderator supports --wolf-disconnect-grace SECONDS (default: 12).
+
+Communications library API (hollowcomm.py)
+  Server: DatagramHub(path, allowed={uid: name}, on_connect=..., on_message=..., on_disconnect=...)
+          await hub.start() / await hub.stop(); hub.send(name, msg); hub.multicast(group, msg);
+          hub.broadcast(msg); hub.join(name, group); hub.leave(name, group); hub.members(group)
+  Client: DatagramClient(path, expect_uid=moderator_uid); await cli.connect();
+          await cli.send(type, **fields); await cli.recv(); await cli.close()
+  Old transport: Hub and Client have equivalent methods for --transport stream.
+
+Rules in one paragraph
+  Night: wolves chat privately and /kill NAME (plurality; ties mean no kill); seer /peek NAME;
+  healer /guard NAME (not twice in a row; self once). Day: public chat, /w NAME text
+  (two private whispers per day), /ready, then /vote NAME or /vote none (open ballots).
+  Roles are revealed on death. Village wins when no wolves remain; wolves win at parity.
+  If every surviving wolf stays disconnected beyond the grace period, village wins by forfeit.
